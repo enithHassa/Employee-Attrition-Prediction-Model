@@ -32,7 +32,7 @@ st.set_page_config(page_title="Attrition Risk (GBM)", page_icon="🧑‍💼", l
 st.title("🧑‍💼 Employee Attrition Risk Prediction")
 
 # --- Inputs ---
-col1,col2 = st.columns(2)
+col1, col2 = st.columns(2)
 with col1:
     age = st.number_input("Age",18,60,30)
     years_company = st.number_input("Years at Company",0,60,3)
@@ -62,34 +62,19 @@ threshold = st.slider("Decision Threshold",0.05,0.95,0.5,0.01)
 
 # --- Prediction ---
 if st.button("Predict risk"):
-    # Start with numeric + ordinal features
-    row = {
+    # Raw row, matching training input
+    row = pd.DataFrame([{
         "Age": age, "Years at Company": years_company, "Monthly Income": monthly_income,
         "Number of Promotions": num_prom, "Distance from Home": dist_home,
         "Company Tenure": tenure, "Number of Dependents": dependents,
-        "Work-Life Balance": wlb, "Job Satisfaction": job_sat,
-        "Performance Rating": perf, "Company Reputation": reputation,
-        "Employee Recognition": recognition
-    }
+        "Gender": gender, "Job Role": job_role, "Education Level": edu,
+        "Marital Status": marital, "Job Level": job_level, "Company Size": company_size,
+        "Remote Work": remote, "Leadership Opportunities": leader, "Innovation Opportunities": innov,
+        "Overtime": overtime, "Work-Life Balance": wlb, "Job Satisfaction": job_sat,
+        "Performance Rating": perf, "Company Reputation": reputation, "Employee Recognition": recognition
+    }])
 
-    # Add dummy-encoded features (1 if chosen, else 0)
-    dummies = {
-        f"Gender_Male": 1 if gender=="Male" else 0,
-        f"Job Role_{job_role}": 1,
-        f"Education Level_{edu}": 1,
-        f"Marital Status_{marital}": 1,
-        f"Job Level_{job_level}": 1,
-        f"Company Size_{company_size}": 1,
-        f"Remote Work_Yes": 1 if remote=="Yes" else 0,
-        f"Leadership Opportunities_Yes": 1 if leader=="Yes" else 0,
-        f"Innovation Opportunities_Yes": 1 if innov=="Yes" else 0,
-        f"Overtime_Yes": 1 if overtime=="Yes" else 0
-    }
-
-    row.update(dummies)
-    row = pd.DataFrame([row])
-
-    # Align with training column order (fill missing with 0)
+    # Reindex to match training columns (fill missing with 0)
     row = row.reindex(columns=train_columns, fill_value=0)
 
     # --- Predict ---

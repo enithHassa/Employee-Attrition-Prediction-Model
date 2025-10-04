@@ -3,7 +3,6 @@ import pandas as pd
 import streamlit as st
 from sklearn.base import BaseEstimator, TransformerMixin
 import json
-import os
 
 # --- Custom transformer used in pipeline ---
 class Winsorizer(BaseEstimator, TransformerMixin):
@@ -24,7 +23,7 @@ class Winsorizer(BaseEstimator, TransformerMixin):
                 X[c] = X[c].clip(lo, hi)
         return X
 
-# --- Load pipeline + column order ---
+# --- Load pipeline + training column names ---
 pipe = joblib.load("gbm_pipeline.pkl")
 with open("gbm_columns.json", "r") as f:
     train_columns = json.load(f)
@@ -45,10 +44,10 @@ with col1:
 with col2:
     gender = st.selectbox("Gender",["Male","Female"])
     job_role = st.selectbox("Job Role",["Finance","Healthcare","Technology","Education","Media"])
-    edu = st.selectbox("Education Level",["High School","Associate Degree","Bachelor’s Degree","Master’s Degree","PhD"])
-    marital = st.selectbox("Marital Status",["Married","Single","Divorced"])
+    edu = st.selectbox("Education Level",["High School","Bachelor’s Degree","Master’s Degree","PhD"])
+    marital = st.selectbox("Marital Status",["Married","Single"])
     job_level = st.selectbox("Job Level",["Entry","Mid","Senior"])
-    company_size = st.selectbox("Company Size",["Small","Medium","Large"])
+    company_size = st.selectbox("Company Size",["Small","Medium"])
     remote = st.selectbox("Remote Work",["No","Yes"])
     leader = st.selectbox("Leadership Opportunities",["No","Yes"])
     innov = st.selectbox("Innovation Opportunities",["No","Yes"])
@@ -63,18 +62,34 @@ threshold = st.slider("Decision Threshold",0.05,0.95,0.5,0.01)
 
 # --- Prediction ---
 if st.button("Predict risk"):
-    row = pd.DataFrame([{
+    # Start with numeric + ordinal features
+    row = {
         "Age": age, "Years at Company": years_company, "Monthly Income": monthly_income,
         "Number of Promotions": num_prom, "Distance from Home": dist_home,
         "Company Tenure": tenure, "Number of Dependents": dependents,
-        "Gender": gender, "Job Role": job_role, "Education Level": edu,
-        "Marital Status": marital, "Job Level": job_level, "Company Size": company_size,
-        "Remote Work": remote, "Leadership Opportunities": leader, "Innovation Opportunities": innov,
-        "Overtime": overtime, "Work-Life Balance": wlb, "Job Satisfaction": job_sat,
-        "Performance Rating": perf, "Company Reputation": reputation, "Employee Recognition": recognition
-    }])
+        "Work-Life Balance": wlb, "Job Satisfaction": job_sat,
+        "Performance Rating": perf, "Company Reputation": reputation,
+        "Employee Recognition": recognition
+    }
 
-    # Align columns with training
+    # Add dummy-encoded features (1 if chosen, else 0)
+    dummies = {
+        f"Gender_Male": 1 if gender=="Male" else 0,
+        f"Job Role_{job_role}": 1,
+        f"Education Level_{edu}": 1,
+        f"Marital Status_{marital}": 1,
+        f"Job Level_{job_level}": 1,
+        f"Company Size_{company_size}": 1,
+        f"Remote Work_Yes": 1 if remote=="Yes" else 0,
+        f"Leadership Opportunities_Yes": 1 if leader=="Yes" else 0,
+        f"Innovation Opportunities_Yes": 1 if innov=="Yes" else 0,
+        f"Overtime_Yes": 1 if overtime=="Yes" else 0
+    }
+
+    row.update(dummies)
+    row = pd.DataFrame([row])
+
+    # Align with training column order (fill missing with 0)
     row = row.reindex(columns=train_columns, fill_value=0)
 
     # --- Predict ---

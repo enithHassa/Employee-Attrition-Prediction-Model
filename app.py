@@ -1,90 +1,140 @@
 import joblib
 import pandas as pd
 import streamlit as st
+from sklearn.base import BaseEstimator, TransformerMixin
 import json
 
-# --- Load pipeline ---
-pipe = joblib.load("gbm_pipeline.pkl")
+# ---------- Custom transformer (needed to unpickle the pipeline) ----------
+class Winsorizer(BaseEstimator, TransformerMixin):
+    def __init__(self, cols, lower=0.01, upper=0.99):
+        self.cols, self.lower, self.upper = cols, lower, upper
+        self.bounds_ = {}
+    def fit(self, X, y=None):
+        X = X.copy()
+        for c in self.cols:
+            if c in X and pd.api.types.is_numeric_dtype(X[c]):
+                lo, hi = X[c].quantile(self.lower), X[c].quantile(self.upper)
+                self.bounds_[c] = (lo, hi)
+        return self
+    def transform(self, X):
+        X = X.copy()
+        for c, (lo, hi) in self.bounds_.items():
+            if c in X and pd.api.types.is_numeric_dtype(X[c]):
+                X[c] = X[c].clip(lo, hi)
+        return X
 
-# --- Load training columns (so Streamlit builds same dummy structure) ---
+# ---------- Load pipeline + training column order ----------
+pipe = joblib.load("gbm_pipeline.pkl")
 with open("gbm_columns.json", "r") as f:
     train_columns = json.load(f)
 
 st.set_page_config(page_title="Attrition Risk (GBM)", page_icon="🧑‍💼", layout="centered")
 st.title("🧑‍💼 Employee Attrition Risk Prediction")
 
-# --- Inputs ---
+# Little helper so we never forget Overtime
+def assert_required_column(cols_list, col_name: str):
+    if col_name not in cols_list:
+        st.error(
+            f"Model expects a column '{col_name}' but it's missing from gbm_columns.json.\n"
+            f"→ Rebuild and re-save pipeline + columns JSON in the same run."
+        )
+        st.stop()
+
+# ---------- UI ----------
 col1, col2 = st.columns(2)
 with col1:
-    age = st.number_input("Age",18,60,30)
-    years_company = st.number_input("Years at Company",0,60,3)
-    monthly_income = st.number_input("Monthly Income",0,20000,6000,step=100)
-    num_prom = st.number_input("Number of Promotions",0,20,0)
-    dist_home = st.number_input("Distance from Home (miles)",0,300,10)
-    tenure = st.number_input("Company Tenure (years)",0,200,10)
-    dependents = st.number_input("Number of Dependents",0,10,0)
+    age = st.number_input("Age", 18, 60, 30)
+    years_company = st.number_input("Years at Company", 0, 60, 3)
+    monthly_income = st.number_input("Monthly Income", 0, 20000, 6000, step=100)
+    num_prom = st.number_input("Number of Promotions", 0, 20, 0)
+    dist_home = st.number_input("Distance from Home (miles)", 0, 300, 10)
+    tenure = st.number_input("Company Tenure (years)", 0, 200, 10)
+    dependents = st.number_input("Number of Dependents", 0, 10, 0)
 with col2:
-    gender = st.selectbox("Gender",["Male","Female"])
-    job_role = st.selectbox("Job Role",["Finance","Healthcare","Technology","Education","Media"])
-    edu = st.selectbox("Education Level",["High School","Associate Degree","Bachelor’s Degree","Master’s Degree","PhD"])
-    marital = st.selectbox("Marital Status",["Married","Single","Divorced"])
-    job_level = st.selectbox("Job Level",["Entry","Mid","Senior"])
-    company_size = st.selectbox("Company Size",["Small","Medium","Large"])
-    remote = st.selectbox("Remote Work",["No","Yes"])
-    leader = st.selectbox("Leadership Opportunities",["No","Yes"])
-    innov = st.selectbox("Innovation Opportunities",["No","Yes"])
-    overtime = st.selectbox("Overtime",["No","Yes"])
+    gender = st.selectbox("Gender", ["Male", "Female"])
+    job_role = st.selectbox("Job Role", ["Finance","Healthcare","Technology","Education","Media"])
+    edu = st.selectbox("Education Level", ["High School","Bachelor’s Degree","Master’s Degree","PhD"])
+    marital = st.selectbox("Marital Status", ["Married","Single"])
+    job_level = st.selectbox("Job Level", ["Entry","Mid","Senior"])
+    company_size = st.selectbox("Company Size", ["Small","Medium"])
+    remote = st.selectbox("Remote Work", ["No","Yes"])
+    leader = st.selectbox("Leadership Opportunities", ["No","Yes"])
+    innov = st.selectbox("Innovation Opportunities", ["No","Yes"])
+    overtime = st.selectbox("Overtime", ["No","Yes"])  # <- raw categorical in splits, but expected as a numeric column
 
-wlb = st.selectbox("Work-Life Balance",["Poor","Below Average","Good","Excellent"])
-job_sat = st.selectbox("Job Satisfaction",["Very Low","Low","Medium","High"])
-perf = st.selectbox("Performance Rating",["Low","Below Average","Average","High"])
-reputation = st.selectbox("Company Reputation",["Very Poor","Poor","Good","Excellent"])
-recognition = st.selectbox("Employee Recognition",["Very Low","Low","Medium","High"])
-threshold = st.slider("Decision Threshold",0.05,0.95,0.5,0.01)
+wlb = st.selectbox("Work-Life Balance", ["Poor","Below Average","Good","Excellent"])
+job_sat = st.selectbox("Job Satisfaction", ["Very Low","Low","Medium","High"])
+perf = st.selectbox("Performance Rating", ["Low","Below Average","Average","High"])
+reputation = st.selectbox("Company Reputation", ["Very Poor","Poor","Good","Excellent"])
+recognition = st.selectbox("Employee Recognition", ["Very Low","Low","Medium","High"])
+threshold = st.slider("Decision Threshold", 0.05, 0.95, 0.5, 0.01)
 
-# --- Prediction ---
+show_debug = st.checkbox("Show debug info")
+
+# ---------- Prediction ----------
 if st.button("Predict risk"):
-    # Start with all 0 columns
+    # 1) Start with all-zeros row for every training column
     row = pd.DataFrame([[0]*len(train_columns)], columns=train_columns)
 
-    # Fill numeric values
-    row["Age"] = age
-    row["Years at Company"] = years_company
-    row["Monthly Income"] = monthly_income
-    row["Number of Promotions"] = num_prom
-    row["Distance from Home"] = dist_home
-    row["Company Tenure"] = tenure
-    row["Number of Dependents"] = dependents
-
-    # Fill binary dummies
-    if f"Gender_{gender}" in row.columns: row[f"Gender_{gender}"] = 1
-    if f"Job Role_{job_role}" in row.columns: row[f"Job Role_{job_role}"] = 1
-    if f"Education Level_{edu}" in row.columns: row[f"Education Level_{edu}"] = 1
-    if f"Marital Status_{marital}" in row.columns: row[f"Marital Status_{marital}"] = 1
-    if f"Job Level_{job_level}" in row.columns: row[f"Job Level_{job_level}"] = 1
-    if f"Company Size_{company_size}" in row.columns: row[f"Company Size_{company_size}"] = 1
-    if f"Remote Work_{remote}" in row.columns: row[f"Remote Work_{remote}"] = 1
-    if f"Leadership Opportunities_{leader}" in row.columns: row[f"Leadership Opportunities_{leader}"] = 1
-    if f"Innovation Opportunities_{innov}" in row.columns: row[f"Innovation Opportunities_{innov}"] = 1
-    if "Overtime" in row.columns: row["Overtime"] = 1 if overtime=="Yes" else 0
-
-    # Ordinal features (already numeric in splits, so we map them to numbers)
-    ordinal_maps = {
-        "Work-Life Balance": {"Poor":0,"Below Average":1,"Good":2,"Excellent":3},
-        "Job Satisfaction": {"Very Low":0,"Low":1,"Medium":2,"High":3},
-        "Performance Rating": {"Low":0,"Below Average":1,"Average":2,"High":3},
-        "Company Reputation": {"Very Poor":0,"Poor":1,"Good":2,"Excellent":3},
-        "Employee Recognition": {"Very Low":0,"Low":1,"Medium":2,"High":3},
+    # 2) Numeric / ordinal columns (present as numeric columns in your splits)
+    #    These MUST be in train_columns, otherwise your JSON and model are out of sync.
+    numeric_ordinal_values = {
+        "Age": age,
+        "Years at Company": years_company,
+        "Monthly Income": monthly_income,
+        "Number of Promotions": num_prom,
+        "Distance from Home": dist_home,
+        "Company Tenure": tenure,
+        "Number of Dependents": dependents,
+        # Ordinals were stored as numeric in splits (0..3) — we map them now:
+        "Work-Life Balance": {"Poor":0,"Below Average":1,"Good":2,"Excellent":3}[wlb],
+        "Job Satisfaction": {"Very Low":0,"Low":1,"Medium":2,"High":3}[job_sat],
+        "Performance Rating": {"Low":0,"Below Average":1,"Average":2,"High":3}[perf],
+        "Company Reputation": {"Very Poor":0,"Poor":1,"Good":2,"Excellent":3}[reputation],
+        "Employee Recognition": {"Very Low":0,"Low":1,"Medium":2,"High":3}[recognition],
     }
-    row["Work-Life Balance"] = ordinal_maps["Work-Life Balance"][wlb]
-    row["Job Satisfaction"] = ordinal_maps["Job Satisfaction"][job_sat]
-    row["Performance Rating"] = ordinal_maps["Performance Rating"][perf]
-    row["Company Reputation"] = ordinal_maps["Company Reputation"][reputation]
-    row["Employee Recognition"] = ordinal_maps["Employee Recognition"][recognition]
+    for k, v in numeric_ordinal_values.items():
+        if k in row.columns:
+            row.at[0, k] = v  # set value only if model used that column
 
-    # --- Predict ---
-    prob = float(pipe.predict_proba(row)[:,1][0])
+    # 3) One-hot dummies (set only the column(s) that exist in training)
+    def set_dummy(prefix: str, value: str):
+        col = f"{prefix}_{value}"
+        if col in row.columns:
+            row.at[0, col] = 1
+
+    set_dummy("Gender", "Male" if gender == "Male" else "Female")  # if Female dummy was dropped, it just won't be set
+    # Job Role dummies used in your splits (Finance/Healthcare/Media/Technology; Education was the baseline)
+    set_dummy("Job Role", job_role)
+    # Education Level dummies present in your splits (no Associate Degree there)
+    set_dummy("Education Level", edu)
+    # Marital Status dummies present in your splits (Married, Single; Divorced was baseline)
+    set_dummy("Marital Status", marital)
+    # Job Level dummies (Mid, Senior; Entry baseline)
+    set_dummy("Job Level", job_level)
+    # Company Size dummies (Small, Medium; Large baseline)
+    set_dummy("Company Size", company_size)
+    # Binary “Yes” flags that were one-hot encoded in splits
+    if "Remote Work_Yes" in row.columns:
+        row.at[0, "Remote Work_Yes"] = 1 if remote == "Yes" else 0
+    if "Leadership Opportunities_Yes" in row.columns:
+        row.at[0, "Leadership Opportunities_Yes"] = 1 if leader == "Yes" else 0
+    if "Innovation Opportunities_Yes" in row.columns:
+        row.at[0, "Innovation Opportunities_Yes"] = 1 if innov == "Yes" else 0
+
+    # 4) Overtime — your splits kept it as a separate column named exactly "Overtime"
+    #    And later we trained the model with it **as numeric** (1/0). Ensure it’s present & numeric:
+    assert_required_column(train_columns, "Overtime")
+    row["Overtime"] = 1 if overtime == "Yes" else 0
+
+    if show_debug:
+        st.write("Non-zero columns being sent to model:", list(row.columns[(row != 0).any(axis=0)]))
+        st.write("Has 'Overtime' column?", "Overtime" in row.columns)
+        st.write("Overtime value:", int(row.at[0, "Overtime"]) if "Overtime" in row else "N/A")
+
+    # 5) Predict
+    prob = float(pipe.predict_proba(row)[:, 1][0])
     pred = int(prob >= threshold)
 
     st.subheader(f"Probability of leaving: **{prob:.2%}**")
-    st.write("Prediction:", "🔴 High risk" if pred==1 else "🟢 Low risk")
+    st.write("Prediction:", "🔴 High risk" if pred == 1 else "🟢 Low risk")

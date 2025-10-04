@@ -78,17 +78,18 @@ if st.button("Predict risk"):
     for col in numeric_features:
         row[col] = pd.to_numeric(row[col], errors="coerce")
 
-    # Ensure ordinal categories match training
-    ordinal_map = {
-        "Work-Life Balance": ["Poor","Below Average","Good","Excellent"],
-        "Job Satisfaction": ["Very Low","Low","Medium","High"],
-        "Performance Rating": ["Low","Below Average","Average","High"],
-        "Company Reputation": ["Very Poor","Poor","Good","Excellent"],
-        "Employee Recognition": ["Very Low","Low","Medium","High"]
-    }
-    for col, cats in ordinal_map.items():
-        if col in row:
-            row[col] = pd.Categorical(row[col], categories=cats, ordered=True)
+   # Ensure ordinal categories match training
+ordinal_map = {
+    "Work-Life Balance": ["Poor","Below Average","Good","Excellent"],
+    "Job Satisfaction": ["Very Low","Low","Medium","High"],
+    "Performance Rating": ["Low","Below Average","Average","High"],
+    "Company Reputation": ["Very Poor","Poor","Good","Excellent"],
+    "Employee Recognition": ["Very Low","Low","Medium","High"]
+}
+
+for col, cats in ordinal_map.items():
+    if col in row:
+        row[col] = pd.Categorical(row[col], categories=cats, ordered=True)
 
     prob = float(pipe.predict_proba(row)[:,1][0])
     pred = int(prob >= threshold)

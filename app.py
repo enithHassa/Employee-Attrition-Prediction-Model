@@ -23,7 +23,7 @@ class Winsorizer(BaseEstimator, TransformerMixin):
         return X
 
 # --- Load pipeline ---
-pipe = joblib.load("gbm_pipeline.pkl")  # ✅ path simplified for GitHub deployment
+pipe = joblib.load("gbm_pipeline.pkl")  # Path relative for Streamlit Cloud
 
 st.set_page_config(page_title="Attrition Risk (GBM)", page_icon="🧑‍💼", layout="centered")
 st.title("🧑‍💼 Employee Attrition Risk Prediction")
@@ -31,31 +31,31 @@ st.title("🧑‍💼 Employee Attrition Risk Prediction")
 # --- Inputs ---
 col1, col2 = st.columns(2)
 with col1:
-    age = st.number_input("Age",18,60,30)
-    years_company = st.number_input("Years at Company",0,60,3)
-    monthly_income = st.number_input("Monthly Income",0,20000,6000,step=100)
-    num_prom = st.number_input("Number of Promotions",0,20,0)
-    dist_home = st.number_input("Distance from Home (miles)",0,300,10)
-    tenure = st.number_input("Company Tenure (years)",0,200,10)
-    dependents = st.number_input("Number of Dependents",0,10,0)
+    age = st.number_input("Age", 18, 60, 30)
+    years_company = st.number_input("Years at Company", 0, 60, 3)
+    monthly_income = st.number_input("Monthly Income", 0, 20000, 6000, step=100)
+    num_prom = st.number_input("Number of Promotions", 0, 20, 0)
+    dist_home = st.number_input("Distance from Home (miles)", 0, 300, 10)
+    tenure = st.number_input("Company Tenure (years)", 0, 200, 10)
+    dependents = st.number_input("Number of Dependents", 0, 10, 0)
 with col2:
-    gender = st.selectbox("Gender",["Male","Female"])
-    job_role = st.selectbox("Job Role",["Finance","Healthcare","Technology","Education","Media"])
-    edu = st.selectbox("Education Level",["High School","Associate Degree","Bachelor’s Degree","Master’s Degree","PhD"])
-    marital = st.selectbox("Marital Status",["Married","Single","Divorced"])
-    job_level = st.selectbox("Job Level",["Entry","Mid","Senior"])
-    company_size = st.selectbox("Company Size",["Small","Medium","Large"])
-    remote = st.selectbox("Remote Work",["No","Yes"])
-    leader = st.selectbox("Leadership Opportunities",["No","Yes"])
-    innov = st.selectbox("Innovation Opportunities",["No","Yes"])
-    overtime = st.selectbox("Overtime",["No","Yes"])
+    gender = st.selectbox("Gender", ["Male","Female"])
+    job_role = st.selectbox("Job Role", ["Finance","Healthcare","Technology","Education","Media"])
+    edu = st.selectbox("Education Level", ["High School","Associate Degree","Bachelor’s Degree","Master’s Degree","PhD"])
+    marital = st.selectbox("Marital Status", ["Married","Single","Divorced"])
+    job_level = st.selectbox("Job Level", ["Entry","Mid","Senior"])
+    company_size = st.selectbox("Company Size", ["Small","Medium","Large"])
+    remote = st.selectbox("Remote Work", ["No","Yes"])
+    leader = st.selectbox("Leadership Opportunities", ["No","Yes"])
+    innov = st.selectbox("Innovation Opportunities", ["No","Yes"])
+    overtime = st.selectbox("Overtime", ["No","Yes"])
 
-wlb = st.selectbox("Work-Life Balance",["Poor","Below Average","Good","Excellent"])
-job_sat = st.selectbox("Job Satisfaction",["Very Low","Low","Medium","High"])
-perf = st.selectbox("Performance Rating",["Low","Below Average","Average","High"])
-reputation = st.selectbox("Company Reputation",["Very Poor","Poor","Good","Excellent"])
-recognition = st.selectbox("Employee Recognition",["Very Low","Low","Medium","High"])
-threshold = st.slider("Decision Threshold",0.05,0.95,0.5,0.01)
+wlb = st.selectbox("Work-Life Balance", ["Poor","Below Average","Good","Excellent"])
+job_sat = st.selectbox("Job Satisfaction", ["Very Low","Low","Medium","High"])
+perf = st.selectbox("Performance Rating", ["Low","Below Average","Average","High"])
+reputation = st.selectbox("Company Reputation", ["Very Poor","Poor","Good","Excellent"])
+recognition = st.selectbox("Employee Recognition", ["Very Low","Low","Medium","High"])
+threshold = st.slider("Decision Threshold", 0.05, 0.95, 0.5, 0.01)
 
 # --- Prediction ---
 if st.button("Predict risk"):
@@ -75,22 +75,20 @@ if st.button("Predict risk"):
         "Age","Years at Company","Monthly Income","Number of Promotions",
         "Distance from Home","Company Tenure","Number of Dependents"
     ]
-    for col in numeric_features:
-        row[col] = pd.to_numeric(row[col], errors="coerce")
+    row[numeric_features] = row[numeric_features].apply(pd.to_numeric, errors="coerce")
 
-   # Ensure ordinal categories match training
-ordinal_map = {
-    "Work-Life Balance": ["Poor","Below Average","Good","Excellent"],
-    "Job Satisfaction": ["Very Low","Low","Medium","High"],
-    "Performance Rating": ["Low","Below Average","Average","High"],
-    "Company Reputation": ["Very Poor","Poor","Good","Excellent"],
-    "Employee Recognition": ["Very Low","Low","Medium","High"]
-}
-
-for col, cats in ordinal_map.items():
-    if col in row:
+    # Ensure ordinal categories are passed correctly
+    ordinal_map = {
+        "Work-Life Balance": ["Poor","Below Average","Good","Excellent"],
+        "Job Satisfaction": ["Very Low","Low","Medium","High"],
+        "Performance Rating": ["Low","Below Average","Average","High"],
+        "Company Reputation": ["Very Poor","Poor","Good","Excellent"],
+        "Employee Recognition": ["Very Low","Low","Medium","High"]
+    }
+    for col, cats in ordinal_map.items():
         row[col] = pd.Categorical(row[col], categories=cats, ordered=True)
 
+    # --- Predict ---
     prob = float(pipe.predict_proba(row)[:,1][0])
     pred = int(prob >= threshold)
 

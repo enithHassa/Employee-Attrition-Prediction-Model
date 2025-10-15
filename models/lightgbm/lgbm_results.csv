@@ -1,0 +1,2 @@
+Model,Accuracy,Precision,Recall,F1,ROC_AUC,Train_Time_sec,Test_Time_sec,Interpretability
+LightGBM,0.7583892617449665,0.7470755051400213,0.7436485532815809,0.7453580901856764,0.8471966458383281,2.244,0.573,Medium (feature importance plots available)

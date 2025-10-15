@@ -1,0 +1,2 @@
+Model,Accuracy,Precision,Recall,F1,ROC_AUC,Train_Time_sec,Test_Time_sec,Interpretability
+XGBoost,0.7578020134228188,0.7474639615589963,0.7410021171489062,0.7442190130238328,0.8464309910595723,1.729,0.095,Medium (feature importance plots available)

@@ -138,3 +138,97 @@ if st.button("Predict risk"):
 
     st.subheader(f"Probability of leaving: **{prob:.2%}**")
     st.write("Prediction:", "🔴 High risk" if pred == 1 else "🟢 Low risk")
+
+        # --- Dynamic tone based on probability ---
+    if prob >= 0.8:
+        st.warning("⚠️ Very high risk of attrition — immediate HR attention recommended.")
+    elif prob >= 0.6:
+        st.info("🔶 Moderate to high risk — review key employee satisfaction factors.")
+    elif prob <= 0.3:
+        st.success("✅ Very low attrition risk — employee appears stable and satisfied.")
+    else:
+        st.info("🟢 Low to moderate risk — maintain positive engagement and monitor occasionally.")
+
+    # --- Rule-based recommendations ---
+    suggestions = []
+
+    # ----- HIGH RISK CASES -----
+    if pred == 1:
+        # Job satisfaction
+        if job_sat in ["Very Low", "Low"]:
+            suggestions.append("Improve job satisfaction through recognition, workload management, or career development.")
+        elif job_sat == "Medium":
+            suggestions.append("Consider gathering feedback to identify satisfaction issues.")
+
+        # Work-life balance
+        if wlb in ["Poor", "Below Average"]:
+            suggestions.append("Encourage flexible hours or partial remote work to enhance work-life balance.")
+
+        # Compensation fairness
+        if monthly_income < 4000 and job_level in ["Mid", "Senior"]:
+            suggestions.append("Review compensation fairness relative to experience and job level.")
+        elif monthly_income < 2500 and job_level == "Entry":
+            suggestions.append("Consider revising entry-level pay to stay competitive.")
+
+        # Performance & development
+        if perf in ["Low", "Below Average"]:
+            suggestions.append("Provide mentoring or upskilling to improve performance.")
+        elif perf == "Average":
+            suggestions.append("Encourage further training to boost performance.")
+
+        # Recognition
+        if recognition in ["Very Low", "Low"]:
+            suggestions.append("Enhance recognition programs — appreciation improves retention.")
+
+        # Company reputation
+        if reputation in ["Very Poor", "Poor"]:
+            suggestions.append("Work on strengthening company culture and internal communication.")
+
+        # Education vs income mismatch
+        if edu in ["Master’s Degree", "PhD"] and monthly_income < 5000:
+            suggestions.append("Reevaluate compensation for highly qualified employees.")
+
+        # Tenure and promotion stagnation
+        if years_company > 8 and num_prom == 0:
+            suggestions.append("Consider promotions or new responsibilities for long-tenured employees.")
+
+        # Distance and remote options
+        if dist_home > 30:
+            suggestions.append("Explore hybrid work — long commutes often lead to attrition.")
+        if remote == "No" and wlb in ["Poor", "Below Average"]:
+            suggestions.append("Introduce partial remote options to reduce burnout.")
+
+        # Growth & innovation opportunities
+        if leader == "No":
+            suggestions.append("Offer leadership opportunities to enhance engagement.")
+        if innov == "No":
+            suggestions.append("Encourage involvement in innovation projects to increase motivation.")
+
+    # ----- LOW RISK CASES -----
+    else:
+        if prob < 0.2:
+            st.success("🌟 Excellent retention indicators — maintain current work environment.")
+        elif prob < 0.4:
+            st.info("👍 Stable employee — small improvements could lower risk further.")
+
+        # Reinforce positives
+        if job_sat == "High":
+            suggestions.append("Continue providing career growth and recognition programs.")
+        if wlb in ["Good", "Excellent"]:
+            suggestions.append("Maintain balanced workloads and flexible arrangements.")
+        if recognition == "High":
+            suggestions.append("Keep up recognition culture — proven to boost loyalty.")
+
+        # Continuous improvement
+        if perf == "Average":
+            suggestions.append("Encourage further skill-building to reach high performance.")
+        if years_company > 5 and num_prom < 1:
+            suggestions.append("Plan career progression paths to maintain motivation.")
+
+    # --- Display recommendations ---
+    if suggestions:
+        st.markdown("### 💡 Recommendations:")
+        for s in suggestions:
+            icon = "⚠️" if pred == 1 else "✅"
+            st.markdown(f"{icon} {s}")
+

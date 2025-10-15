@@ -31,7 +31,7 @@ with open("gbm_columns.json", "r") as f:
 st.set_page_config(page_title="Attrition Risk (GBM)", page_icon="🧑‍💼", layout="centered")
 st.title("🧑‍💼 Employee Attrition Risk Prediction")
 
-# Little helper so we never forget Overtime
+# Little helper for consistency check
 def assert_required_column(cols_list, col_name: str):
     if col_name not in cols_list:
         st.error(
@@ -60,7 +60,7 @@ with col2:
     remote = st.selectbox("Remote Work", ["No","Yes"])
     leader = st.selectbox("Leadership Opportunities", ["No","Yes"])
     innov = st.selectbox("Innovation Opportunities", ["No","Yes"])
-    overtime = st.selectbox("Overtime", ["No","Yes"])  # <- raw categorical in splits, but expected as a numeric column
+    overtime = st.selectbox("Overtime", ["No","Yes"])
 
 wlb = st.selectbox("Work-Life Balance", ["Poor","Below Average","Good","Excellent"])
 job_sat = st.selectbox("Job Satisfaction", ["Very Low","Low","Medium","High"])
@@ -73,11 +73,10 @@ show_debug = st.checkbox("Show debug info")
 
 # ---------- Prediction ----------
 if st.button("Predict risk"):
-    # 1) Start with all-zeros row for every training column
+    # 1) Start with zero row for every training column
     row = pd.DataFrame([[0]*len(train_columns)], columns=train_columns)
 
-    # 2) Numeric / ordinal columns (present as numeric columns in your splits)
-    #    These MUST be in train_columns, otherwise your JSON and model are out of sync.
+    # 2) Numeric & Ordinal columns
     numeric_ordinal_values = {
         "Age": age,
         "Years at Company": years_company,
@@ -86,7 +85,6 @@ if st.button("Predict risk"):
         "Distance from Home": dist_home,
         "Company Tenure": tenure,
         "Number of Dependents": dependents,
-        # Ordinals were stored as numeric in splits (0..3) — we map them now:
         "Work-Life Balance": {"Poor":0,"Below Average":1,"Good":2,"Excellent":3}[wlb],
         "Job Satisfaction": {"Very Low":0,"Low":1,"Medium":2,"High":3}[job_sat],
         "Performance Rating": {"Low":0,"Below Average":1,"Average":2,"High":3}[perf],
@@ -95,26 +93,20 @@ if st.button("Predict risk"):
     }
     for k, v in numeric_ordinal_values.items():
         if k in row.columns:
-            row.at[0, k] = v  # set value only if model used that column
+            row.at[0, k] = v
 
-    # 3) One-hot dummies (set only the column(s) that exist in training)
+    # 3) One-hot dummies
     def set_dummy(prefix: str, value: str):
         col = f"{prefix}_{value}"
         if col in row.columns:
             row.at[0, col] = 1
 
-    set_dummy("Gender", "Male" if gender == "Male" else "Female")  # if Female dummy was dropped, it just won't be set
-    # Job Role dummies used in your splits (Finance/Healthcare/Media/Technology; Education was the baseline)
+    set_dummy("Gender", gender)
     set_dummy("Job Role", job_role)
-    # Education Level dummies present in your splits (no Associate Degree there)
     set_dummy("Education Level", edu)
-    # Marital Status dummies present in your splits (Married, Single; Divorced was baseline)
     set_dummy("Marital Status", marital)
-    # Job Level dummies (Mid, Senior; Entry baseline)
     set_dummy("Job Level", job_level)
-    # Company Size dummies (Small, Medium; Large baseline)
     set_dummy("Company Size", company_size)
-    # Binary “Yes” flags that were one-hot encoded in splits
     if "Remote Work_Yes" in row.columns:
         row.at[0, "Remote Work_Yes"] = 1 if remote == "Yes" else 0
     if "Leadership Opportunities_Yes" in row.columns:
@@ -122,24 +114,21 @@ if st.button("Predict risk"):
     if "Innovation Opportunities_Yes" in row.columns:
         row.at[0, "Innovation Opportunities_Yes"] = 1 if innov == "Yes" else 0
 
-    # 4) Overtime — your splits kept it as a separate column named exactly "Overtime"
-    #    And later we trained the model with it **as numeric** (1/0). Ensure it’s present & numeric:
     assert_required_column(train_columns, "Overtime")
     row["Overtime"] = 1 if overtime == "Yes" else 0
 
     if show_debug:
-        st.write("Non-zero columns being sent to model:", list(row.columns[(row != 0).any(axis=0)]))
-        st.write("Has 'Overtime' column?", "Overtime" in row.columns)
-        st.write("Overtime value:", int(row.at[0, "Overtime"]) if "Overtime" in row else "N/A")
+        st.write("Non-zero columns sent to model:", list(row.columns[(row != 0).any(axis=0)]))
+        st.write("Overtime value:", row["Overtime"].iloc[0])
 
-    # 5) Predict
+    # 4) Predict
     prob = float(pipe.predict_proba(row)[:, 1][0])
     pred = int(prob >= threshold)
 
     st.subheader(f"Probability of leaving: **{prob:.2%}**")
     st.write("Prediction:", "🔴 High risk" if pred == 1 else "🟢 Low risk")
 
-        # --- Dynamic tone based on probability ---
+    # --- Dynamic tone based on probability ---
     if prob >= 0.8:
         st.warning("⚠️ Very high attrition risk detected — urgent HR intervention recommended.")
     elif prob >= 0.6:
@@ -156,69 +145,68 @@ if st.button("Predict risk"):
     if pred == 1:
         st.warning("🚨 **High attrition risk detected** — recommended HR review.")
 
-        # 1️⃣ Job Satisfaction
-        if row["Job Satisfaction"].iloc[0] in ["Very Low", "Low"]:
+        # Job Satisfaction
+        if job_sat in ["Very Low", "Low"]:
             suggestions.append("Improve job satisfaction via recognition, career development, or workload balance.")
-        elif row["Job Satisfaction"].iloc[0] == "Medium":
+        elif job_sat == "Medium":
             suggestions.append("Conduct one-on-one sessions to identify job satisfaction pain points.")
 
-        # 2️⃣ Work-Life Balance
-        if row["Work-Life Balance"].iloc[0] in ["Poor", "Below Average"]:
+        # Work-Life Balance
+        if wlb in ["Poor", "Below Average"]:
             suggestions.append("Encourage flexible working hours or hybrid options to improve work-life balance.")
 
-        # 3️⃣ Compensation Fairness
-        if row["Monthly Income"].iloc[0] < 4000 and row["Job Level"].iloc[0] in ["Mid", "Senior"]:
+        # Compensation Fairness
+        if monthly_income < 4000 and job_level in ["Mid", "Senior"]:
             suggestions.append("Reassess salary fairness compared to industry averages for experienced staff.")
-        elif row["Monthly Income"].iloc[0] < 2500 and row["Job Level"].iloc[0] == "Entry":
+        elif monthly_income < 2500 and job_level == "Entry":
             suggestions.append("Review entry-level pay rates to ensure competitiveness and motivation.")
 
-        # 4️⃣ Performance and Growth
-        if row["Performance Rating"].iloc[0] in ["Low", "Below Average"]:
+        # Performance and Growth
+        if perf in ["Low", "Below Average"]:
             suggestions.append("Offer mentoring, performance improvement plans, or training programs.")
-        elif row["Performance Rating"].iloc[0] == "Average":
+        elif perf == "Average":
             suggestions.append("Encourage training or certifications to boost performance and confidence.")
 
-        # 5️⃣ Recognition & Engagement
-        if row["Employee Recognition"].iloc[0] in ["Very Low", "Low"]:
+        # Recognition & Engagement
+        if recognition in ["Very Low", "Low"]:
             suggestions.append("Enhance recognition initiatives — even small gestures improve engagement.")
 
-        # 6️⃣ Company Reputation
-        if row["Company Reputation"].iloc[0] in ["Very Poor", "Poor"]:
+        # Company Reputation
+        if reputation in ["Very Poor", "Poor"]:
             suggestions.append("Improve internal communication and transparency to rebuild trust in company image.")
 
-        # 7️⃣ Education vs Income Mismatch
-        if row["Education Level"].iloc[0] in ["Master’s Degree", "PhD"] and row["Monthly Income"].iloc[0] < 5000:
+        # Education vs Income Mismatch
+        if edu in ["Master’s Degree", "PhD"] and monthly_income < 5000:
             suggestions.append("Highly educated employees may feel undervalued — review compensation alignment.")
 
-        # 8️⃣ Tenure and Promotions
-        if row["Years at Company"].iloc[0] > 8 and row["Number of Promotions"].iloc[0] == 0:
+        # Tenure and Promotions
+        if years_company > 8 and num_prom == 0:
             suggestions.append("Consider new challenges, project leadership, or promotion opportunities.")
-        elif row["Years at Company"].iloc[0] > 5 and row["Number of Promotions"].iloc[0] < 1:
+        elif years_company > 5 and num_prom < 1:
             suggestions.append("Discuss growth prospects to prevent stagnation feelings.")
 
-        # 9️⃣ Distance from Work
-        if row["Distance from Home"].iloc[0] > 30:
+        # Distance from Work
+        if dist_home > 30:
             suggestions.append("Long commutes increase stress — explore remote or hybrid work arrangements.")
 
-        # 🔟 Leadership & Innovation Opportunities
-        if row["Leadership Opportunities"].iloc[0] == "No":
+        # Leadership & Innovation
+        if leader == "No":
             suggestions.append("Provide leadership chances to build ownership and motivation.")
-        if row["Innovation Opportunities"].iloc[0] == "No":
+        if innov == "No":
             suggestions.append("Encourage involvement in innovation or creative initiatives to build engagement.")
 
-        # 🏠 Remote Work Impact
-        if row["Remote Work"].iloc[0] == "No" and row["Work-Life Balance"].iloc[0] in ["Poor", "Below Average"]:
+        # Remote Work Impact
+        if remote == "No" and wlb in ["Poor", "Below Average"]:
             suggestions.append("Introduce partial remote-work options to reduce burnout risk.")
 
-        # 🧠 Overtime consideration
-        if row["Overtime"].iloc[0] == 1:
+        # Overtime
+        if overtime == "Yes":
             suggestions.append("Reduce excessive overtime — fatigue contributes to attrition.")
 
     # ----- LOW RISK CASES -----
     else:
         st.success("✅ Low attrition risk detected — employee appears engaged and content.")
 
-        # Dynamic tone based on probability range
         if prob < 0.2:
             st.balloons()
             suggestions.append("Maintain the current positive work environment — retention outlook excellent.")
@@ -226,19 +214,19 @@ if st.button("Predict risk"):
             suggestions.append("Stable engagement — continue recognition and feedback initiatives.")
 
         # Reinforce Positives
-        if row["Job Satisfaction"].iloc[0] == "High":
+        if job_sat == "High":
             suggestions.append("Continue growth opportunities and feedback — this employee is thriving.")
-        if row["Work-Life Balance"].iloc[0] in ["Good", "Excellent"]:
+        if wlb in ["Good", "Excellent"]:
             suggestions.append("Keep flexible and balanced workload to sustain motivation.")
-        if row["Employee Recognition"].iloc[0] in ["High"]:
+        if recognition == "High":
             suggestions.append("Maintain recognition programs — employees value acknowledgment.")
 
         # Encourage improvement even in low-risk
-        if row["Performance Rating"].iloc[0] == "Average":
+        if perf == "Average":
             suggestions.append("Encourage professional development to push performance from average to high.")
-        if row["Years at Company"].iloc[0] > 5 and row["Number of Promotions"].iloc[0] < 1:
+        if years_company > 5 and num_prom < 1:
             suggestions.append("Plan mid-term career progression or mentoring to sustain engagement.")
-        if row["Innovation Opportunities"].iloc[0] == "No":
+        if innov == "No":
             suggestions.append("Offer small innovation or cross-team projects to retain curiosity.")
 
     # --- Display all suggestions ---

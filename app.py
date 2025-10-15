@@ -141,94 +141,109 @@ if st.button("Predict risk"):
 
         # --- Dynamic tone based on probability ---
     if prob >= 0.8:
-        st.warning("⚠️ Very high risk of attrition — immediate HR attention recommended.")
+        st.warning("⚠️ Very high attrition risk detected — urgent HR intervention recommended.")
     elif prob >= 0.6:
-        st.info("🔶 Moderate to high risk — review key employee satisfaction factors.")
+        st.info("🔶 Moderate-to-high risk — proactive retention strategies advised.")
     elif prob <= 0.3:
-        st.success("✅ Very low attrition risk — employee appears stable and satisfied.")
+        st.success("✅ Very low attrition risk — employee is likely satisfied and stable.")
     else:
-        st.info("🟢 Low to moderate risk — maintain positive engagement and monitor occasionally.")
+        st.info("🟢 Low-to-moderate risk — continue engagement and monitoring.")
 
-    # --- Rule-based recommendations ---
+    # --- Intelligent, rule-based recommendations ---
     suggestions = []
 
     # ----- HIGH RISK CASES -----
     if pred == 1:
-        # Job satisfaction
-        if job_sat in ["Very Low", "Low"]:
-            suggestions.append("Improve job satisfaction through recognition, workload management, or career development.")
-        elif job_sat == "Medium":
-            suggestions.append("Consider gathering feedback to identify satisfaction issues.")
+        st.warning("🚨 **High attrition risk detected** — recommended HR review.")
 
-        # Work-life balance
-        if wlb in ["Poor", "Below Average"]:
-            suggestions.append("Encourage flexible hours or partial remote work to enhance work-life balance.")
+        # 1️⃣ Job Satisfaction
+        if row["Job Satisfaction"].iloc[0] in ["Very Low", "Low"]:
+            suggestions.append("Improve job satisfaction via recognition, career development, or workload balance.")
+        elif row["Job Satisfaction"].iloc[0] == "Medium":
+            suggestions.append("Conduct one-on-one sessions to identify job satisfaction pain points.")
 
-        # Compensation fairness
-        if monthly_income < 4000 and job_level in ["Mid", "Senior"]:
-            suggestions.append("Review compensation fairness relative to experience and job level.")
-        elif monthly_income < 2500 and job_level == "Entry":
-            suggestions.append("Consider revising entry-level pay to stay competitive.")
+        # 2️⃣ Work-Life Balance
+        if row["Work-Life Balance"].iloc[0] in ["Poor", "Below Average"]:
+            suggestions.append("Encourage flexible working hours or hybrid options to improve work-life balance.")
 
-        # Performance & development
-        if perf in ["Low", "Below Average"]:
-            suggestions.append("Provide mentoring or upskilling to improve performance.")
-        elif perf == "Average":
-            suggestions.append("Encourage further training to boost performance.")
+        # 3️⃣ Compensation Fairness
+        if row["Monthly Income"].iloc[0] < 4000 and row["Job Level"].iloc[0] in ["Mid", "Senior"]:
+            suggestions.append("Reassess salary fairness compared to industry averages for experienced staff.")
+        elif row["Monthly Income"].iloc[0] < 2500 and row["Job Level"].iloc[0] == "Entry":
+            suggestions.append("Review entry-level pay rates to ensure competitiveness and motivation.")
 
-        # Recognition
-        if recognition in ["Very Low", "Low"]:
-            suggestions.append("Enhance recognition programs — appreciation improves retention.")
+        # 4️⃣ Performance and Growth
+        if row["Performance Rating"].iloc[0] in ["Low", "Below Average"]:
+            suggestions.append("Offer mentoring, performance improvement plans, or training programs.")
+        elif row["Performance Rating"].iloc[0] == "Average":
+            suggestions.append("Encourage training or certifications to boost performance and confidence.")
 
-        # Company reputation
-        if reputation in ["Very Poor", "Poor"]:
-            suggestions.append("Work on strengthening company culture and internal communication.")
+        # 5️⃣ Recognition & Engagement
+        if row["Employee Recognition"].iloc[0] in ["Very Low", "Low"]:
+            suggestions.append("Enhance recognition initiatives — even small gestures improve engagement.")
 
-        # Education vs income mismatch
-        if edu in ["Master’s Degree", "PhD"] and monthly_income < 5000:
-            suggestions.append("Reevaluate compensation for highly qualified employees.")
+        # 6️⃣ Company Reputation
+        if row["Company Reputation"].iloc[0] in ["Very Poor", "Poor"]:
+            suggestions.append("Improve internal communication and transparency to rebuild trust in company image.")
 
-        # Tenure and promotion stagnation
-        if years_company > 8 and num_prom == 0:
-            suggestions.append("Consider promotions or new responsibilities for long-tenured employees.")
+        # 7️⃣ Education vs Income Mismatch
+        if row["Education Level"].iloc[0] in ["Master’s Degree", "PhD"] and row["Monthly Income"].iloc[0] < 5000:
+            suggestions.append("Highly educated employees may feel undervalued — review compensation alignment.")
 
-        # Distance and remote options
-        if dist_home > 30:
-            suggestions.append("Explore hybrid work — long commutes often lead to attrition.")
-        if remote == "No" and wlb in ["Poor", "Below Average"]:
-            suggestions.append("Introduce partial remote options to reduce burnout.")
+        # 8️⃣ Tenure and Promotions
+        if row["Years at Company"].iloc[0] > 8 and row["Number of Promotions"].iloc[0] == 0:
+            suggestions.append("Consider new challenges, project leadership, or promotion opportunities.")
+        elif row["Years at Company"].iloc[0] > 5 and row["Number of Promotions"].iloc[0] < 1:
+            suggestions.append("Discuss growth prospects to prevent stagnation feelings.")
 
-        # Growth & innovation opportunities
-        if leader == "No":
-            suggestions.append("Offer leadership opportunities to enhance engagement.")
-        if innov == "No":
-            suggestions.append("Encourage involvement in innovation projects to increase motivation.")
+        # 9️⃣ Distance from Work
+        if row["Distance from Home"].iloc[0] > 30:
+            suggestions.append("Long commutes increase stress — explore remote or hybrid work arrangements.")
+
+        # 🔟 Leadership & Innovation Opportunities
+        if row["Leadership Opportunities"].iloc[0] == "No":
+            suggestions.append("Provide leadership chances to build ownership and motivation.")
+        if row["Innovation Opportunities"].iloc[0] == "No":
+            suggestions.append("Encourage involvement in innovation or creative initiatives to build engagement.")
+
+        # 🏠 Remote Work Impact
+        if row["Remote Work"].iloc[0] == "No" and row["Work-Life Balance"].iloc[0] in ["Poor", "Below Average"]:
+            suggestions.append("Introduce partial remote-work options to reduce burnout risk.")
+
+        # 🧠 Overtime consideration
+        if row["Overtime"].iloc[0] == 1:
+            suggestions.append("Reduce excessive overtime — fatigue contributes to attrition.")
 
     # ----- LOW RISK CASES -----
     else:
+        st.success("✅ Low attrition risk detected — employee appears engaged and content.")
+
+        # Dynamic tone based on probability range
         if prob < 0.2:
-            st.success("🌟 Excellent retention indicators — maintain current work environment.")
+            st.balloons()
+            suggestions.append("Maintain the current positive work environment — retention outlook excellent.")
         elif prob < 0.4:
-            st.info("👍 Stable employee — small improvements could lower risk further.")
+            suggestions.append("Stable engagement — continue recognition and feedback initiatives.")
 
-        # Reinforce positives
-        if job_sat == "High":
-            suggestions.append("Continue providing career growth and recognition programs.")
-        if wlb in ["Good", "Excellent"]:
-            suggestions.append("Maintain balanced workloads and flexible arrangements.")
-        if recognition == "High":
-            suggestions.append("Keep up recognition culture — proven to boost loyalty.")
+        # Reinforce Positives
+        if row["Job Satisfaction"].iloc[0] == "High":
+            suggestions.append("Continue growth opportunities and feedback — this employee is thriving.")
+        if row["Work-Life Balance"].iloc[0] in ["Good", "Excellent"]:
+            suggestions.append("Keep flexible and balanced workload to sustain motivation.")
+        if row["Employee Recognition"].iloc[0] in ["High"]:
+            suggestions.append("Maintain recognition programs — employees value acknowledgment.")
 
-        # Continuous improvement
-        if perf == "Average":
-            suggestions.append("Encourage further skill-building to reach high performance.")
-        if years_company > 5 and num_prom < 1:
-            suggestions.append("Plan career progression paths to maintain motivation.")
+        # Encourage improvement even in low-risk
+        if row["Performance Rating"].iloc[0] == "Average":
+            suggestions.append("Encourage professional development to push performance from average to high.")
+        if row["Years at Company"].iloc[0] > 5 and row["Number of Promotions"].iloc[0] < 1:
+            suggestions.append("Plan mid-term career progression or mentoring to sustain engagement.")
+        if row["Innovation Opportunities"].iloc[0] == "No":
+            suggestions.append("Offer small innovation or cross-team projects to retain curiosity.")
 
-    # --- Display recommendations ---
+    # --- Display all suggestions ---
     if suggestions:
         st.markdown("### 💡 Recommendations:")
         for s in suggestions:
             icon = "⚠️" if pred == 1 else "✅"
             st.markdown(f"{icon} {s}")
-

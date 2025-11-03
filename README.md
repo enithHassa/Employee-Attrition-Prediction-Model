@@ -250,31 +250,6 @@ The application will launch at `http://localhost:8501`
    - Actionable HR recommendations
    - Interpretive insights
 
-### Using the Model Programmatically
-
-```python
-import joblib
-import pandas as pd
-import json
-
-# Load pipeline and columns
-pipe = joblib.load("gbm_pipeline.pkl")
-with open("gbm_columns.json", "r") as f:
-    train_columns = json.load(f)
-
-# Prepare employee data
-employee_data = pd.DataFrame([{
-    "Age": 35,
-    "Years at Company": 5,
-    "Monthly Income": 6000,
-    # ... other features
-}])
-
-# Predict
-probability = pipe.predict_proba(employee_data)[:, 1][0]
-prediction = "High Risk" if probability >= 0.5 else "Low Risk"
-```
-
 ## 📋 Model Evaluation
 
 ### Performance Metrics Explained
@@ -376,7 +351,7 @@ This project is open source and available under the [MIT License](LICENSE).
 ## 👤 Authors
 
 **Your Name**
-- GitHub: [@yourusername](https://github.com/yourusername)
+- GitHub: [@enithHassa](https://github.com/enithHassa)
 - Project Link: [https://github.com/yourusername/Employee-Attrition-Prediction-Model](https://github.com/yourusername/Employee-Attrition-Prediction-Model)
 
 ## 🙏 Acknowledgments
